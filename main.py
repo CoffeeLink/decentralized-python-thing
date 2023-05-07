@@ -6,6 +6,14 @@ import threading
 import enum
 
 class MsgField:
+    """ A message field is a name-value pair. The name is a string, and the value can be a string, int, or list.
+    
+    Attributes:
+        name  [str]: The name of the field.
+        value [str|int|list]: The value of the field.
+    
+    """
+
     name : str = None
     value : str = None
     
@@ -13,51 +21,79 @@ class MsgField:
         self.name = name
         self.value = value
     
-    def addToDict(self, dictIn : dict) -> None:
+    def addToDict(self, dictIn : dict) -> dict:
+        """ Adds the field to a dictionary.
+
+        Args:
+            dictIn (dict): The dictionary to add the field to.
+
+        Returns:
+            dict: The dictionary with the field added.
+        """
         dictIn[self.name] = self.value
         return dictIn
 
 class Body:
-    msg_type : MsgField = None
-    msg_id : MsgField = None
-    msg_reply_to : MsgField = None
+    """ A message body is a collection of fields.
+
+    Attributes:
+        msg_type [str]: The type of the message. \n
+        msg_id [int]: This is a unique identifier for the message. (Not required) \n
+        msg_reply_to [int]: The ID of the message that this message is replying to. (Not required) \n
+    """
+    msg_type_ : MsgField = None
+    msg_id_ : MsgField = None
+    msg_reply_to_ : MsgField = None
     
     fields : list[MsgField] = None
     
     @property
     def msg_type(self) -> str:
-        return self.msg_type.value
+        return self.msg_type_.value
     
     @msg_type.setter
     def msg_type(self, value : str) -> None:
-        self.msg_type = MsgField("msg_type", value)
+        self.msg_type_ = MsgField("msg_type", value)
     
     @property
     def msg_id(self) -> int:
-        return self.msg_id.value
+        return self.msg_id_.value
     
     @msg_id.setter
     def msg_id(self, value : int) -> None:
-        self.msg_id = MsgField("msg_id", value)
+        self.msg_id_ = MsgField("msg_id", value)
     
     @property
     def msg_reply_to(self) -> int:
-        return self.msg_reply_to.value
+        return self.msg_reply_to_.value
     
     @msg_reply_to.setter
     def msg_reply_to(self, value : int) -> None:
-        self.msg_reply_to = MsgField("msg_reply_to", value)
+        self.msg_reply_to_ = MsgField("msg_reply_to", value)
         
-    def __init__(self, msg_type : str, msg_id : int, msg_reply_to : int) -> None:
-        self.msg_type = MsgField("msg_type", msg_type)
-        self.msg_id = MsgField("msg_id", msg_id)
-        self.msg_reply_to = MsgField("msg_reply_to", msg_reply_to)
+    def __init__(self, msg_type : str, msg_id : int = None, msg_reply_to : int = None) -> None:
+        self.msg_type_ = MsgField("msg_type", msg_type)
+        self.msg_id_ = MsgField("msg_id", msg_id)
+        self.msg_reply_to_ = MsgField("msg_reply_to", msg_reply_to)
         self.fields = []
         
     def addField(self, name : str, value : str | int | list) -> None:
+        """ Adds a field to the body.
+
+        Args:
+            name (str): The name of the field.
+            value (str | int | list): The value of the field.
+        """
         self.fields.append(MsgField(name, value))
         
     def setField(self, name : str, value : str | int | list) -> None:
+        """ Sets the value of a field.
+        If the field does not exist, it will be created.
+
+        Args:
+            name (str): The name of the field.
+            value (str | int | list): The value of the field.
+        """
         for field in self.fields:
             if field.name == name:
                 field.value = value
@@ -66,21 +102,32 @@ class Body:
         self.addField(name, value)
     
     def delField(self, name : str) -> None:
+        """ Deletes a field. If the field does not exist, nothing happens.
+
+        Args:
+            name (str): The name of the field.
+        """
         for field in self.fields:
             if field.name == name:
                 self.fields.remove(field)
                 return
             
     def toDict(self) -> dict:
+        """ Converts the body to a dictionary. This is used to convert the body to JSON.
+
+        Returns:
+            dict: The dictionary representation of the body.
+        """
+        
         dictOut = {}
         if self.msg_type != None:
-            dictOut = self.msg_type.addToDict(dictOut)
+            dictOut = self.msg_type_.addToDict(dictOut)
         
         if self.msg_id != None:
-            dictOut = self.msg_id.addToDict(dictOut)
+            dictOut = self.msg_id_.addToDict(dictOut)
         
         if self.msg_reply_to != None:
-            dictOut = self.msg_reply_to.addToDict(dictOut)
+            dictOut = self.msg_reply_to_.addToDict(dictOut)
         
         for field in self.fields:
             dictOut = field.addToDict(dictOut)
@@ -89,26 +136,65 @@ class Body:
 
     
 class EchoBody(Body):
+    """ A message body for an echo message.
     
-    echo : MsgField = None
+    Attributes:
+        echo [str]: The message to echo. \n
+        msg_id [int]: This is a unique identifier for the message. (Not required) \n
+        msg_reply_to [int]: The ID of the message that this message is replying to. (Not required) \n
     
-    def __init__(self, msg_id : str, msg_reply_to : str, echo : str) -> None:
-        super().__init__("Echo", msg_id, msg_reply_to)
+    """
+    
+    echo_ : MsgField = None
+    
+    def __init__(self, echo : str, msg_id : int = None, msg_reply_to : int = None) -> None:
+        super().__init__("echo", msg_id, msg_reply_to)
+        self.echo_ = MsgField("echo", echo)
     
     def toDict(self) -> dict:
+        
+        """ Converts the body to a dictionary. This is used to convert the body to JSON.
+
+        Returns:
+            dict: The dictionary representation of the body.
+        """
+        
         dictOut = super().toDict()
+        dictOut = self.echo_.addToDict(dictOut)
+        
         return dictOut
     
     @property
     def echo(self) -> str:
-        return self.echo.value
+        return self.echo_.value
     
     @echo.setter
     def echo(self, value : str) -> None:
-        self.echo = MsgField("echo", value)
+        self.echo_ = MsgField("echo", value)
+
+class EchoReplyBody(EchoBody):
+    """ A message body for an echo reply message. This is a subclass of EchoBody.
+
+    Args:
+        echo [str]: The message to echo.\n
+        msg_id [int]: This is a unique identifier for the message.\n
+        msg_reply_to [int]: The ID of the message that this message is replying to.\n
+    """
+    
+    def __init__(self, msg_id : int, msg_reply_to : int, echo : str) -> None:
+        super().__init__(msg_id, msg_reply_to, echo)
+        self.msg_type = "echo_ok"
     
     
 class Payload:
+    """ A message payload. This is the top level object that is sent over the network.
+
+    Args:
+        src [str]: The source of the message. This is the name of the sender.\n
+        dest [str]: The destination of the message. This is the name of the receiver.\n
+        body [Body]: The body of the message.\n
+    """
+    
     src : str = None
     dest : str = None
     body : Body = None
@@ -119,17 +205,39 @@ class Payload:
         self.body = body
     
     def ToJson(self) -> str:
+        """ Converts the payload to JSON. This is used to send the payload over the network.
+
+        Returns:
+            str: The JSON representation of the payload.
+        """
+        
         dictOut = {"src": self.src, "dest": self.dest, "body": self.body.toDict()}
         return json.dumps(dictOut)
-
-class Node:
-    node_id : str = None
-    node_ip : str = None
     
-    def __init__(self) -> None:
-        pass
+    @staticmethod
+    def FromJson(jsonIn : str):
+        """ Converts a JSON string to a payload object.
 
+        Args:
+            jsonIn (str): The JSON string to convert.
 
-b1 = Body("Echo", 2, 1)
-p1 = Payload("n1", "c1", b1)
-print(p1.ToJson())
+        Returns:
+            Payload: The payload object.
+        """
+        
+        dictIn = json.loads(jsonIn)
+        src = dictIn["src"]
+        dest = dictIn["dest"]
+        
+        bodyDict = dictIn["body"]
+        body = Body(bodyDict["msg_type"], bodyDict["msg_id"], bodyDict["msg_reply_to"])
+        
+        for key in bodyDict:
+            if key not in ["msg_type", "msg_id", "msg_reply_to"]:
+                body.setField(key, bodyDict[key])
+        
+        return Payload(src, dest, body)
+    
+    def __str__(self) -> str:
+        return self.ToJson()
+
