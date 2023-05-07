@@ -133,6 +133,29 @@ class Body:
             dictOut = field.addToDict(dictOut)
         
         return dictOut
+    
+    @classmethod
+    def fromDict(dictIn : dict):
+        """ Creates a body from a dictionary.
+
+        Args:
+            dictIn (dict): The dictionary to create the body from.
+
+        Returns:
+            Body: The body created from the dictionary.
+        """
+        body = Body(dictIn["msg_type"])
+        if "msg_id" in dictIn:
+            body.msg_id = dictIn["msg_id"]
+        
+        if "msg_reply_to" in dictIn:
+            body.msg_reply_to = dictIn["msg_reply_to"]
+        
+        for key in dictIn:
+            if key not in ["msg_type", "msg_id", "msg_reply_to"]:
+                body.addField(key, dictIn[key])
+        
+        return body
 
     
 class EchoBody(Body):
@@ -226,17 +249,7 @@ class Payload:
         """
         
         dictIn = json.loads(jsonIn)
-        src = dictIn["src"]
-        dest = dictIn["dest"]
-        
-        bodyDict = dictIn["body"]
-        body = Body(bodyDict["msg_type"], bodyDict["msg_id"], bodyDict["msg_reply_to"])
-        
-        for key in bodyDict:
-            if key not in ["msg_type", "msg_id", "msg_reply_to"]:
-                body.setField(key, bodyDict[key])
-        
-        return Payload(src, dest, body)
+        return Payload(dictIn["src"], dictIn["dest"], Body.fromDict(dictIn["body"]))
     
     def __str__(self) -> str:
         return self.ToJson()
