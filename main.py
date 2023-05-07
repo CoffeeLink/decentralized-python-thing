@@ -4,6 +4,7 @@ import json
 import os
 import threading
 import enum
+from typing import Callable
 
 class MsgField:
     """ A message field is a name-value pair. The name is a string, and the value can be a string, int, or list.
@@ -254,3 +255,111 @@ class Payload:
     def __str__(self) -> str:
         return self.ToJson()
 
+class NodeConnector:
+    """The 'Interface' for the node. This is the object that is used to send and receive messages.
+    
+    This is a base class and should not be used directly.
+    """
+    
+    recive_listeners : list[Callable[[Payload], None]] = []
+    """A list of functions that are called when a message is received."""
+    
+    
+    def __init__(self) -> None:
+        pass
+    
+    def recive(self, payload : Payload) -> None:
+        """ Recives a message.
+
+        Args:
+            payload (Payload): The message that was received.
+        """
+        for listener in self.recive_listeners:
+            listener(payload)
+    
+    def addReciveListener(self, listener : Callable[[Payload], None]) -> None:
+        """ Adds a function to the recive listener list.
+
+        Args:
+            listener (Callable[[Payload], None]): The function to add.
+        """
+        self.recive_listeners.append(listener)
+    
+    def removeReciveListener(self, listener : Callable[[Payload], None]) -> None:
+        """ Removes a function from the recive listener list.
+
+        Args:
+            listener (Callable[[Payload], None]): The function to remove.
+        """
+        self.recive_listeners.remove(listener)
+    
+class BasicNetworkNodeConnector(NodeConnector):
+    """ A basic node connector. This is a node connector that uses TCP sockets to send and receive messages."""
+    
+    endpoint : str = None
+    endpoint_port : int = None
+    
+    sock : socket.socket = None
+    listening_thread : threading.Thread = None
+    
+    def __init__(self, endpoint : str, endpoint_port : int) -> None:
+        super().__init__()
+        self.endpoint = endpoint
+        self.endpoint_port = endpoint_port
+        
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.sock.connect((self.endpoint, self.endpoint_port))
+        self.sock.setblocking(False)
+        
+        self.listening_thread = threading.Thread(target=self.listening_loop)
+        self.listening_thread.start()
+    
+    def listening_loop(self):
+        while True:
+            try:
+                data = self.sock.recv(1024)
+                if data:
+                    self.recive(Payload.FromJson(data.decode("utf-8")))
+            except BlockingIOError:
+                pass
+            
+    def send(self, payload : Payload) -> None:
+        self.sock.send(payload.ToJson().encode("utf-8"))
+    
+    def close(self):
+        self.sock.close()
+        self.listening_thread.join()
+    
+class Node:
+    node_id : str = None
+    node_name : str = None
+    node_type : str = None
+    
+    connector : NodeConnector = None
+    
+    listeners : dict[str, list[Callable[[Payload], None]]] = {} # {msg_type: [listeners]}
+    
+    def __init__(self, node_id : str, node_name : str, node_type : str, connector : NodeConnector = BasicNetworkNodeConnector) -> None:
+        self.node_id = node_id
+        self.node_name = node_name
+        self.node_type = node_type
+        self.connector = connector
+    
+    def sendPayload(self, payload : Payload) -> None:
+        self.connector.send(payload)
+    
+    def addEventListener(self, msg_type : str, listener : Callable[[Payload], None]) -> None:
+        if msg_type not in self.listeners:
+            self.listeners[msg_type] = []
+        self.listeners[msg_type].append(listener)
+    
+    def removeEventListener(self, msg_type : str, listener : Callable[[Payload], None]) -> None:
+        self.listeners[msg_type].remove(listener)
+    
+    @connector.addReciveListener
+    def on_recive(self, payload : Payload) -> None:
+        if payload.body.msg_type in self.listeners:
+            for listener in self.listeners[payload.body.msg_type]:
+                listener(payload)
+    
+    
